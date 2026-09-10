@@ -1,3 +1,4 @@
+import React from "react";
 import { Eye, Pencil, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,9 +43,19 @@ export const DetectionTable = ({
             </tr>
           </thead>
           <tbody>
-            {documents.map((d, i) => (
+            {documents.map((d, i) => {
+              const showSection = d.section && d.section !== documents[i - 1]?.section;
+              return (
+              <React.Fragment key={d.id}>
+              {showSection && (
+                <tr className="bg-muted/50" data-testid={`section-row-${i}`}>
+                  <td colSpan={7} className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {d.section}
+                  </td>
+                </tr>
+              )}
               <tr
-                key={d.id} data-testid={`doc-row-${i}`}
+                data-testid={`doc-row-${i}`}
                 className={`border-b border-border last:border-0 transition-colors hover:bg-muted/40 ${
                   d.required ? "" : "opacity-55"
                 }`}
@@ -58,6 +69,9 @@ export const DetectionTable = ({
                 <td className="p-3 font-mono text-muted-foreground">{i + 1}</td>
                 <td className="p-3 font-medium max-w-xs">
                   <span className="line-clamp-2">{d.title}</span>
+                  {d.matched_by?.includes("ai") && (
+                    <span className="ml-1 text-[10px] uppercase tracking-wide text-primary bg-primary/10 rounded px-1 py-0.5">AI</span>
+                  )}
                   {d.scanned && (
                     <span className="ml-1 text-[10px] uppercase tracking-wide text-accent-foreground bg-accent/20 rounded px-1 py-0.5">OCR</span>
                   )}
@@ -79,7 +93,9 @@ export const DetectionTable = ({
                   </div>
                 </td>
               </tr>
-            ))}
+              </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster, toast } from "sonner";
-import { FileText, Scissors, RotateCcw, Loader2, ScanSearch } from "lucide-react";
+import { FileText, Scissors, RotateCcw, Loader2, ScanSearch, Sparkles } from "lucide-react";
 import "@/App.css";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Navbar } from "@/components/Navbar";
 import { UploadSection } from "@/components/UploadSection";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
@@ -31,6 +33,8 @@ function Dashboard() {
   const [previewDoc, setPreviewDoc] = useState(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [splitting, setSplitting] = useState(false);
+  const [useAi, setUseAi] = useState(true);
+  const [granularity, setGranularity] = useState("detail");
   const stepTimer = useRef(null);
 
   const refreshTemplates = async () => setTemplates(await api.listTemplates());
@@ -40,7 +44,7 @@ function Dashboard() {
 
   const docs = project?.documents || [];
   const outputs = project?.outputs || [];
-  const analyzed = project?.status === "analyzed" || project?.status === "split";
+  const analyzed = ["analyzed", "splitting", "split"].includes(project?.status);
 
   // ---------- Upload / sample ----------
   const handleUpload = async (file) => {
@@ -87,19 +91,27 @@ function Dashboard() {
     setAnalyzeStep(0);
     stepTimer.current = setInterval(() => {
       setAnalyzeStep((s) => (s < 3 ? s + 1 : s));
-    }, 800);
+    }, useAi ? 4000 : 800);
     try {
       const tpl = selectedTemplate !== "none" ? selectedTemplate : undefined;
-      const p = await api.analyze(project.id, tpl);
+      let p = await api.analyze(project.id, { templateId: tpl, useAi, granularity });
+      while (p.status === "analyzing") {
+        await new Promise((r) => setTimeout(r, 2000));
+        p = await api.getProject(project.id);
+      }
       clearInterval(stepTimer.current);
+      if (p.status === "error") throw new Error(p.ai_error || "Analisa gagal");
       setAnalyzeStep(4);
       setProject(p);
       setTimeout(() => setAnalyzing(false), 500);
-      toast.success(`${p.documents.length} dokumen terdeteksi`);
+      if (useAi && p.analysis_mode !== "ai") {
+        toast.warning("Deteksi AI gagal, memakai deteksi heuristik", { description: p.ai_error || undefined });
+      }
+      toast.success(`${p.documents.length} dokumen terdeteksi${p.analysis_mode === "ai" ? " (AI)" : ""}`);
     } catch (e) {
       clearInterval(stepTimer.current);
       setAnalyzing(false);
-      toast.error(e?.response?.data?.detail || "Analisa gagal");
+      toast.error(e?.response?.data?.detail || e?.message || "Analisa gagal");
     }
     refreshHistory();
   };
@@ -120,7 +132,7 @@ function Dashboard() {
   const deleteDoc = (id) => persist(docs.filter((d) => d.id !== id));
   const addDoc = () => {
     const nd = {
-      id: uid(), title: "Dokumen Baru", start_page: 1, end_page: 1,
+      id: uid(), title: "Dokumen Baru", section: "", start_page: 1, end_page: 1,
       confidence: 70, status: "review", required: true, matched_by: ["manual"], scanned: false,
     };
     persist([...docs, nd]);
@@ -138,11 +150,16 @@ function Dashboard() {
     if (selected.length === 0) { toast.error("Pilih minimal satu dokumen"); return; }
     setSplitting(true);
     try {
-      const p = await api.split(project.id);
+      let p = await api.split(project.id);
+      while (p.status === "splitting") {
+        await new Promise((r) => setTimeout(r, 2000));
+        p = await api.getProject(project.id);
+      }
+      if (p.split_error) throw new Error(p.split_error);
       setProject(p);
       toast.success(`${p.outputs.length} dokumen berhasil dipisahkan`);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Split gagal");
+      toast.error(e?.response?.data?.detail || e?.message || "Split gagal");
     } finally { setSplitting(false); refreshHistory(); }
   };
 
@@ -187,23 +204,39 @@ function Dashboard() {
                 <div className="font-heading font-semibold truncate" data-testid="project-filename">{project.filename}</div>
                 <div className="text-sm text-muted-foreground">
                   {project.pages} halaman • {fmtBytes(project.size_bytes)} •{" "}
-                  <span className="capitalize">{project.status === "uploaded" ? "belum dianalisa" : project.status === "analyzed" ? "sudah dianalisa" : "sudah dipisah"}</span>
+                  <span className="capitalize">{{ uploaded: "belum dianalisa", analyzing: "sedang dianalisa", analyzed: "sudah dianalisa", splitting: "sedang dipisah", split: "sudah dipisah", error: "analisa gagal" }[project.status] || project.status}</span>
+                  {project.analysis_mode && <span className="ml-1 text-xs">({project.analysis_mode === "ai" ? "deteksi AI" : "heuristik"})</span>}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" onClick={reset} className="gap-1.5" data-testid="reset-btn">
                   <RotateCcw className="h-4 w-4" /> PDF Lain
                 </Button>
                 {!analyzed && (
-                  <Button data-testid="analyze-btn" onClick={runAnalyze} disabled={analyzing} className="gap-1.5">
-                    {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
-                    Analisa PDF
-                  </Button>
+                  <>
+                    <Select value={granularity} onValueChange={setGranularity}>
+                      <SelectTrigger className="w-[190px]" data-testid="granularity-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="detail">Per item / mata uji</SelectItem>
+                        <SelectItem value="section">Per bagian besar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <label className="flex items-center gap-2 text-sm px-3 h-10 rounded-md border border-input cursor-pointer select-none" data-testid="use-ai-toggle">
+                      <Switch checked={useAi} onCheckedChange={setUseAi} data-testid="use-ai-switch" />
+                      <Sparkles className="h-4 w-4 text-primary" /> Deteksi AI
+                    </label>
+                    <Button data-testid="analyze-btn" onClick={runAnalyze} disabled={analyzing} className="gap-1.5">
+                      {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}
+                      Analisa PDF
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
 
-            {analyzing && <AnalysisProgress step={analyzeStep} />}
+            {analyzing && <AnalysisProgress step={analyzeStep} ai={useAi} />}
 
             {analyzed && !analyzing && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

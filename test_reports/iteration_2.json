@@ -1,0 +1,32 @@
+{
+  "summary": "Backend (9/9 pytest passed) + Frontend end-to-end validated. Uploaded /root/lhpp.pdf (126 pages) successfully. Async analyze flow polls to 'analyzed'. AI detail mode returns >40 docs with matched_by='ai', ordered non-overlapping ranges covering pages 1-126, and 'Spesifikasi Teknik Mesin' spans page 5. Heuristic mode returns >20 docs (fix confirmed for repeated-header issue). Section granularity returns fewer docs than detail. PUT documents persists section and records corrections. Split runs async, produces valid PDFs (size>0, %PDF header), and download-zip returns valid ZIP with matching count in <60s. Frontend: sample -> granularity-select, use-ai-switch, analyze-btn visible; analysis-progress shows during analysis; detection-table renders with section-row-* groupings and 'AI' badges; split-btn triggers split-results view with SIUjang Ready checklist and Download ZIP button.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py still uses deprecated @app.on_event('startup'/'shutdown') - consider migrating to FastAPI lifespan handler.",
+    "_run_analysis creates a background task via asyncio.create_task without tracking; if two concurrent analyze calls hit the same pid they can race. The 'status==analyzing' early-return partially guards this, but there's a window between get_project and update_one that isn't atomic.",
+    "download-zip rebuilds PDFs from source on every call (slow for large PDFs re-request); consider caching the built ZIP once status='split'.",
+    "matched_by contains 'ai' string tag - good; but 'required' logic in _run_analysis excludes any doc whose section=='Pembukaan' or matched_by contains 'cover'. This is implicit; document the rule."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all critical flow steps passed)"},
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "Uploaded /root/lhpp.pdf, plus sample project created for regression",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend analyze/split are async now - poll GET /api/projects/{pid} for status transitions ('analyzing'->'analyzed', 'splitting'->'split'). Use POST params use_ai (bool) and granularity ('detail'|'section'). Detail mode on lhpp.pdf yields ~90+ AI docs; section yields ~10-30. All 9 tests take ~2 min due to AI latency."
+}

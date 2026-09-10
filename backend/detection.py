@@ -86,6 +86,37 @@ def extract_pages(pdf_path, ocr_threshold=40):
     return pages
 
 
+def strip_repeating_lines(pages, min_ratio=0.4):
+    """Remove header/footer lines that repeat on many pages; sets page['clean_text']."""
+    if len(pages) < 4:
+        for p in pages:
+            p["clean_text"] = p["text"]
+        return pages
+    counts = Counter()
+    for p in pages:
+        for l in {l.strip() for l in p["text"].splitlines() if l.strip()}:
+            counts[l] += 1
+    repeating = {l for l, c in counts.items() if c >= max(3, int(len(pages) * min_ratio))}
+    for p in pages:
+        kept = [l for l in p["text"].splitlines() if l.strip() and l.strip() not in repeating]
+        p["clean_text"] = "\n".join(kept)
+    return pages
+
+
+CONTINUATION_RE = re.compile(r'^(FOTO|HASIL|DOKUMENTASI|GAMBAR\s+PENGUJIAN|LAMPIRAN\s+FOTO)\b', re.IGNORECASE)
+
+
+def _section_heading(text):
+    """First ALL-CAPS heading line at the top of a (cleaned) page, if any."""
+    for l in _top_lines(text, 3):
+        letters = re.sub(r'[^A-Za-z]', '', l)
+        if (len(letters) >= 6 and l.upper() == l and len(l) <= 80 and not l[0].isdigit()
+                and not CONTINUATION_RE.match(l)
+                and not re.match(r'^(NO\.?|MATA UJI|KRITERIA|HASIL)$', l)):
+            return l
+    return None
+
+
 def _top_lines(text, n=12):
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     return lines[:n]
@@ -128,7 +159,7 @@ def _match_category(text, learned=None):
 
 
 def _analyze_page(page, learned=None):
-    text = page["text"]
+    text = page.get("clean_text", page["text"])
     top_block = "\n".join(_top_lines(text, 12))
 
     # Table-of-contents / daftar isi detection: many numbered items on one page
@@ -163,6 +194,7 @@ def _analyze_page(page, learned=None):
 
     return {
         "numbered": numbered,
+        "section": _section_heading(text),
         "cat_title": cat_title,
         "cat_score": cat_score,
         "cat_kw": cat_kw,
@@ -181,6 +213,7 @@ def detect_documents(pages, learned_titles=None):
     analyzed = [_analyze_page(p, learned_titles) for p in pages]
     docs = []
     last_number = 0
+    cur_section = None
 
     for idx, (page, sig) in enumerate(zip(pages, analyzed)):
         start_new = False
@@ -192,6 +225,12 @@ def detect_documents(pages, learned_titles=None):
             if docs:
                 docs[-1]["end_page"] = page["num"]
             continue
+
+        # New ALL-CAPS section heading -> numbering restarts (e.g. "PEMERIKSAAN KESESUAIAN DESAIN")
+        section_changed = sig["section"] is not None and sig["section"] != cur_section
+        if section_changed:
+            cur_section = sig["section"]
+            last_number = 0
 
         num_ok = (
             sig["numbered"] is not None
@@ -212,12 +251,17 @@ def detect_documents(pages, learned_titles=None):
                 title = sig["cat_title"]
                 matched_by.append("keyword")
                 matched_by.append("heading")
+        elif section_changed:
+            start_new = True
+            title = cur_section.title()
+            matched_by.append("heading")
 
         if start_new:
             if docs:
                 docs[-1]["end_page"] = page["num"] - 1
             docs.append({
                 "title": title or f"Dokumen (Halaman {page['num']})",
+                "section": (cur_section or "").title(),
                 "start_page": page["num"],
                 "end_page": page["num"],
                 "matched_by": matched_by,
@@ -235,6 +279,7 @@ def detect_documents(pages, learned_titles=None):
     if docs and docs[0]["start_page"] > 1:
         docs.insert(0, {
             "title": "Sampul / Daftar Isi",
+            "section": "Pembukaan",
             "start_page": 1,
             "end_page": docs[0]["start_page"] - 1,
             "matched_by": ["cover"],
@@ -245,6 +290,7 @@ def detect_documents(pages, learned_titles=None):
     if not docs:
         docs.append({
             "title": "Dokumen Lengkap",
+            "section": "",
             "start_page": 1,
             "end_page": len(pages),
             "matched_by": [],

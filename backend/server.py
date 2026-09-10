@@ -1,7 +1,9 @@
 import os
 import uuid
+import asyncio
 import logging
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional, Annotated
@@ -14,6 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
 
 import detection
+import ai_detection
 import pdf_utils
 import storage_client as store
 
@@ -46,6 +49,7 @@ def output_key(pid, filename): return f"{APP}/{pid}/output/{filename}"
 class DocumentItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
+    section: str = ""
     start_page: int
     end_page: int
     confidence: int = 80
@@ -95,9 +99,52 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 
 # ---------------- Analyze ----------------
+async def _run_analysis(pid, path, learned, use_ai, granularity, template_id):
+    try:
+        pages = await asyncio.to_thread(detection.extract_pages, path)
+        pages = detection.strip_repeating_lines(pages)
+        meta = detection.extract_metadata(pages)
+
+        detected, mode, ai_error = None, "heuristic", None
+        if use_ai:
+            try:
+                detected = await ai_detection.detect_documents_ai(pages, granularity)
+                mode = "ai"
+            except Exception as e:
+                logger.exception("AI detection failed, falling back to heuristic")
+                ai_error = str(e)[:300]
+        if not detected:
+            detected = detection.detect_documents(pages, learned_titles=list(learned))
+            mode = "heuristic"
+
+        documents = []
+        for d in detected:
+            item = DocumentItem(
+                title=d["title"], section=d.get("section", ""),
+                start_page=d["start_page"], end_page=d["end_page"],
+                confidence=d["confidence"], status=d["status"],
+                matched_by=d["matched_by"], scanned=d["scanned"],
+                required=("cover" not in d["matched_by"] and d.get("section") != "Pembukaan"),
+            )
+            documents.append(item.model_dump())
+
+        await db.projects.update_one(
+            {"id": pid},
+            {"$set": {"documents": documents, "metadata": meta, "status": "analyzed",
+                      "template_id": template_id, "analysis_mode": mode,
+                      "granularity": granularity, "ai_error": ai_error}})
+    except Exception as e:
+        logger.exception("Analysis failed")
+        await db.projects.update_one(
+            {"id": pid}, {"$set": {"status": "error", "ai_error": str(e)[:300]}})
+
+
 @api.post("/projects/{pid}/analyze")
-async def analyze(pid: str, template_id: Optional[str] = None):
-    await get_project(pid)
+async def analyze(pid: str, template_id: Optional[str] = None,
+                  use_ai: bool = True, granularity: str = "detail"):
+    project = await get_project(pid)
+    if project.get("status") == "analyzing":
+        return project
     path = store.local_cache_path(orig_key(pid))
 
     learned = set()
@@ -109,24 +156,8 @@ async def analyze(pid: str, template_id: Optional[str] = None):
         if tpl:
             learned.update(tpl.get("documents", []))
 
-    pages = detection.extract_pages(path)
-    detected = detection.detect_documents(pages, learned_titles=list(learned))
-    meta = detection.extract_metadata(pages)
-
-    documents = []
-    for d in detected:
-        item = DocumentItem(
-            title=d["title"], start_page=d["start_page"], end_page=d["end_page"],
-            confidence=d["confidence"], status=d["status"],
-            matched_by=d["matched_by"], scanned=d["scanned"],
-            required=("cover" not in d["matched_by"]),
-        )
-        documents.append(item.model_dump())
-
-    await db.projects.update_one(
-        {"id": pid},
-        {"$set": {"documents": documents, "metadata": meta,
-                  "status": "analyzed", "template_id": template_id}})
+    await db.projects.update_one({"id": pid}, {"$set": {"status": "analyzing", "ai_error": None}})
+    asyncio.create_task(_run_analysis(pid, path, learned, use_ai, granularity, template_id))
     return await get_project(pid)
 
 
@@ -192,29 +223,48 @@ async def original_pdf(pid: str):
 
 
 # ---------------- Split selected documents ----------------
+def _split_one(pid, path, i, d):
+    fname = pdf_utils.safe_filename(i, d["title"])
+    tmp = Path(tempfile.gettempdir()) / f"{pid}_{fname}"
+    pdf_utils.split_document(path, d["start_page"], d["end_page"], str(tmp))
+    size = tmp.stat().st_size
+    store.upload_from_path(output_key(pid, fname), str(tmp), "application/pdf")
+    tmp.unlink(missing_ok=True)
+    return {
+        "id": d["id"], "index": i, "filename": fname, "title": d["title"],
+        "section": d.get("section", ""),
+        "start_page": d["start_page"], "end_page": d["end_page"], "size_bytes": size,
+    }
+
+
+async def _run_split(pid, path, selected):
+    try:
+        loop = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            tasks = [loop.run_in_executor(pool, _split_one, pid, path, i, d)
+                     for i, d in enumerate(selected, start=1)]
+            results = await asyncio.gather(*tasks)
+        await db.projects.update_one(
+            {"id": pid}, {"$set": {"status": "split", "outputs": list(results), "split_at": now_iso()}})
+    except Exception as e:
+        logger.exception("Split failed")
+        await db.projects.update_one(
+            {"id": pid}, {"$set": {"status": "analyzed", "split_error": str(e)[:300]}})
+
+
 @api.post("/projects/{pid}/split")
 async def split(pid: str):
     project = await get_project(pid)
+    if project.get("status") == "splitting":
+        return project
     path = store.local_cache_path(orig_key(pid))
     selected = [d for d in project.get("documents", []) if d.get("required")]
     if not selected:
         raise HTTPException(400, "Tidak ada dokumen yang dipilih")
 
-    results = []
-    for i, d in enumerate(selected, start=1):
-        fname = pdf_utils.safe_filename(i, d["title"])
-        tmp = Path(tempfile.gettempdir()) / f"{pid}_{fname}"
-        pdf_utils.split_document(path, d["start_page"], d["end_page"], str(tmp))
-        size = tmp.stat().st_size
-        store.upload_from_path(output_key(pid, fname), str(tmp), "application/pdf")
-        tmp.unlink(missing_ok=True)
-        results.append({
-            "id": d["id"], "index": i, "filename": fname, "title": d["title"],
-            "start_page": d["start_page"], "end_page": d["end_page"], "size_bytes": size,
-        })
-
     await db.projects.update_one(
-        {"id": pid}, {"$set": {"status": "split", "outputs": results, "split_at": now_iso()}})
+        {"id": pid}, {"$set": {"status": "splitting", "split_error": None, "outputs": []}})
+    asyncio.create_task(_run_split(pid, path, selected))
     return await get_project(pid)
 
 
@@ -229,17 +279,22 @@ async def get_output(pid: str, filename: str, download: bool = False):
     return Response(content=data, media_type="application/pdf", headers=headers)
 
 
+def _build_zip(path, outputs):
+    files = []
+    for o in outputs:
+        data = pdf_utils.split_document_bytes(path, o["start_page"], o["end_page"])
+        files.append((o["filename"], data))
+    return pdf_utils.build_zip_bytes(files)
+
+
 @api.get("/projects/{pid}/download-zip")
 async def download_zip(pid: str):
     project = await get_project(pid)
     outputs = project.get("outputs", [])
     if not outputs:
         raise HTTPException(400, "Belum ada dokumen hasil split")
-    files = []
-    for o in outputs:
-        data = store.get_object(output_key(pid, o["filename"]))
-        files.append((o["filename"], data))
-    buf = pdf_utils.build_zip_bytes(files)
+    path = store.local_cache_path(orig_key(pid))
+    buf = await asyncio.to_thread(_build_zip, path, outputs)
     base = os.path.splitext(project["filename"])[0]
     return StreamingResponse(
         buf, media_type="application/zip",

@@ -30,9 +30,19 @@ def split_document(pdf_path, start_page, end_page, out_path):
     s = max(0, start_page - 1)
     e = min(len(src) - 1, end_page - 1)
     out.insert_pdf(src, from_page=s, to_page=e)
-    out.save(out_path)  # no downscaling / re-compression -> original quality kept
+    out.save(out_path, garbage=3, deflate=True)  # drop unused objects; page content stays lossless
     out.close()
     src.close()
+
+
+def split_document_bytes(pdf_path, start_page, end_page):
+    src = pymupdf.open(pdf_path)
+    out = pymupdf.open()
+    out.insert_pdf(src, from_page=max(0, start_page - 1), to_page=min(len(src) - 1, end_page - 1))
+    data = out.tobytes(garbage=3, deflate=True)
+    out.close()
+    src.close()
+    return data
 
 
 def safe_filename(index, title):

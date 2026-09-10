@@ -2,13 +2,14 @@ import { CheckCircle2, Loader2, Circle } from "lucide-react";
 
 const STEPS = [
   "Membaca PDF",
-  "Mendeteksi struktur",
+  "Menghapus header berulang",
   "Mendeteksi dokumen",
   "Menentukan batas halaman",
   "Selesai",
 ];
 
-export const AnalysisProgress = ({ step }) => {
+export const AnalysisProgress = ({ step, ai }) => {
+  const steps = ai ? STEPS.map((s, i) => (i === 2 ? "AI membaca judul tiap halaman (±30 detik)" : s)) : STEPS;
   return (
     <div data-testid="analysis-progress" className="rounded-2xl border border-border bg-card p-6 fade-up">
       <div className="flex items-center gap-2 mb-5">
@@ -16,7 +17,7 @@ export const AnalysisProgress = ({ step }) => {
         <span className="font-heading font-semibold">Menganalisa dokumen…</span>
       </div>
       <div className="space-y-3">
-        {STEPS.map((label, i) => {
+        {steps.map((label, i) => {
           const done = i < step;
           const active = i === step;
           return (

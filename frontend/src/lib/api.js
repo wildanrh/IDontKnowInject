@@ -15,8 +15,11 @@ export const api = {
     return data;
   },
   createSample: async () => (await http.post("/projects/sample")).data,
-  analyze: async (pid, templateId) =>
-    (await http.post(`/projects/${pid}/analyze`, null, { params: templateId ? { template_id: templateId } : {} })).data,
+  analyze: async (pid, { templateId, useAi = true, granularity = "detail" } = {}) =>
+    (await http.post(`/projects/${pid}/analyze`, null, {
+      params: { ...(templateId ? { template_id: templateId } : {}), use_ai: useAi, granularity },
+      timeout: 600000,
+    })).data,
   getProject: async (pid) => (await http.get(`/projects/${pid}`)).data,
   listProjects: async () => (await http.get("/projects")).data,
   deleteProject: async (pid) => (await http.delete(`/projects/${pid}`)).data,
