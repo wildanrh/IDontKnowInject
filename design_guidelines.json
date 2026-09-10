@@ -1,0 +1,141 @@
+{
+  "project_name": "SIUjang Document Manager",
+  "app_type": "hybrid_fullstack (document processing dashboard / SaaS app for electricity & power plant industry)",
+  "language": "Bahasa Indonesia",
+  "theme": {
+    "default_mode": "light",
+    "supported_modes": ["light", "dark"],
+    "archetype": "THE PERFORMANCE PRO / INDUSTRIAL UTILITY",
+    "description": "High-clarity industrial utility dashboard tailored for power plant engineers, PLN inspectors, and administrative staff preparing LHPP documents for SIUjang Gatrik compliance."
+  },
+  "colors": {
+    "primary_brand": {
+      "hex": "#0284C7",
+      "tailwind": "sky-600",
+      "hover_hex": "#0369A1",
+      "description": "Electric Sky Blue - representing power transmission, technology, and official verification."
+    },
+    "accent_energy": {
+      "hex": "#F59E0B",
+      "tailwind": "amber-500",
+      "hover_hex": "#D97706",
+      "description": "High-Voltage Amber - for highlight actions, confidence warning badges, and active drag-drop zones."
+    },
+    "status_success": {
+      "hex": "#10B981",
+      "tailwind": "emerald-500",
+      "bg_light": "bg-emerald-50 text-emerald-700 border-emerald-200",
+      "label": "SIUjang Ready (90%+ Confidence)"
+    },
+    "status_warning": {
+      "hex": "#F59E0B",
+      "tailwind": "amber-500",
+      "bg_light": "bg-amber-50 text-amber-700 border-amber-200",
+      "label": "Perlu Review (50%-89% Confidence)"
+    },
+    "status_danger": {
+      "hex": "#EF4444",
+      "tailwind": "red-500",
+      "bg_light": "bg-red-50 text-red-700 border-red-200",
+      "label": "Tidak Valid / Error (<50% Confidence)"
+    },
+    "background_light": "#F8FAFC",
+    "surface_light": "#FFFFFF",
+    "border_light": "#E2E8F0",
+    "text_main_light": "#0F172A",
+    "text_muted_light": "#64748B",
+    "background_dark": "#0B0F19",
+    "surface_dark": "#111827",
+    "border_dark": "#1F2937",
+    "text_main_dark": "#F9FAFB",
+    "text_muted_dark": "#9CA3AF"
+  },
+  "typography": {
+    "font_headings": "Outfit, Plus Jakarta Sans, sans-serif",
+    "font_body": "Inter, system-ui, sans-serif",
+    "font_mono": "JetBrains Mono, IBM Plex Mono, monospace",
+    "scale": {
+      "h1_title": "text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight",
+      "h2_section": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h3_card": "text-base sm:text-lg font-semibold",
+      "body_normal": "text-sm sm:text-base font-normal leading-relaxed",
+      "caption": "text-xs font-medium uppercase tracking-wider text-muted-foreground",
+      "code_mono": "font-mono text-xs sm:text-sm font-semibold"
+    }
+  },
+  "layout_and_grids": {
+    "type": "High Density Responsive Dashboard",
+    "container_max_width": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing_philosophy": "Generous interior padding (p-6 to p-8) with clear structural borders to prevent data overcrowding.",
+    "key_panels": [
+      {
+        "id": "header_nav",
+        "component": "TopNavbar",
+        "description": "Branding SIUjang Gatrik Assistant, Template Switcher dropdown, dark/light mode toggle, and live SIUjang Ready checklist progress summary pill."
+      },
+      {
+        "id": "upload_and_template_hero",
+        "component": "UploadSection",
+        "description": "Drag and drop zone with pulse border animation, sample LHPP generator button ('Coba File Contoh LHPP PLTD'), file detail badge, and [Analisa PDF] button with step-by-step progress tracker."
+      },
+      {
+        "id": "metadata_and_readiness",
+        "component": "MetadataReadinessPanel",
+        "description": "Extracted metadata card grid (Nomor Laporan, Tanggal, Perusahaan, Instalasi, Kapasitas, Inspector) + Interactive SIUjang Readiness checklist with auto-validation status."
+      },
+      {
+        "id": "detection_results_table",
+        "component": "DocumentDetectionTable",
+        "description": "Dense data table & responsive grid showing detected documents, content-aware page bounds (Halaman Awal - Akhir), confidence meter badge (e.g. 98%, 68%), required checkbox toggle ('Diperlukan'), inline page & title edit modal trigger, and row quick action bar."
+      },
+      {
+        "id": "split_actions_bar",
+        "component": "SplitActionBar",
+        "description": "Sticky bottom or prominent action panel with count of selected files, [SPLIT DOKUMEN TERPILIH] button, and [DOWNLOAD ZIP SEMUA] option."
+      },
+      {
+        "id": "pdf_preview_workspace",
+        "component": "PDFPreviewModal",
+        "description": "Split workspace with visual page thumbnail filmstrip on the left and full embedded PDF viewer / page inspector on the right."
+      },
+      {
+        "id": "template_manager_drawer",
+        "component": "TemplateManagerDrawer",
+        "description": "Configuration drawer to manage document classification templates (LHPP PLTD, PLTU, PLTG, PLTS, Substation/Gardu) with key keywords and item structures."
+      }
+    ]
+  },
+  "key_features_mapping": {
+    "PDF Drag & Drop Upload Area": "Dropzone with active border highlight, file type validator (.pdf), file size calculation, and quick reset.",
+    "Analisa PDF Button with Progress Steps": "Simulated or real OCR/Structure analysis engine showing progressive step badges: 1. Membaca PDF -> 2. Mendeteksi Struktur -> 3. Identifikasi Judul & Tabel -> 4. Batas Halaman -> 5. Selesai.",
+    "Detection Results Table": "Columns: Checkbox (Select), No, Nama Dokumen (edit inline), Halaman (e.g., Hal 1-4), Confidence Score Badge (High/Warn/Low), Status Badge (✓ Siap / ⚠ Perlu Review), Actions (Edit, Preview, Download).",
+    "Inline Edit & Manual Override": "Allows user to adjust document title, start page, end page, add missing document split, or delete false positive splits.",
+    "Document Selection Checkboxes": "Filters and highlights 'HANYA DOKUMEN YANG DIPERLUKAN' with batch select all / deselect optional documents.",
+    "Split Selected Documents Button": "Triggers splitting algorithm for selected documents only, generating distinct named PDF files.",
+    "PDF Preview": "Browser embed + Thumbnail grid with highlight overlay showing start page and end page boundary.",
+    "Download Options": "Download single document file or batch Download ZIP containing structured folder of split PDFs.",
+    "Document Template Manager": "Preset rules for LHPP PLTD, PLTU, PLTS, and General Electrical Inspection Reports.",
+    "Extracted Metadata Panel": "Extracted key parameters formatted cleanly with copy-to-clipboard buttons for SIUjang portal copy-pasting.",
+    "SIUjang Ready Status Checklist": "Automated checklist verifying all required documents (e.g. Sertifikat Kelaikan Operasi, Hasil Uji Peralatan, Drawing Single Line, Laporan Pemeriksaan) are present and verified."
+  },
+  "image_urls": {
+    "power_plant_banner": "https://images.unsplash.com/photo-1630142896875-d71a6ee6db03?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwzfHxwb3dlciUyMHBsYW50JTIwZWxlY3RyaWNhbCUyMGVuZ2luZWVyJTIwZG9jdW1lbnRzfGVufDB8fHx8MTc4OTA0NzUyNnww&ixlib=rb-4.1.0&q=85",
+    "transmission_towers": "https://images.unsplash.com/photo-1644567103258-6da3857faab4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwyfHxwb3dlciUyMHBsYW50JTIwZWxlY3RyaWNhbCUyMGVuZ2luZWVyJTIwZG9jdW1lbnRzfGVufDB8fHx8MTc4OTA0NzUyNnww&ixlib=rb-4.1.0&q=85",
+    "grid_substation": "https://images.unsplash.com/photo-1588339251392-e1405faa28bd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHw0fHxwb3dlciUyMHBsYW50JTIwZWxlY3RyaWNhbCUyMGVuZ2luZWVyJTIwZG9jdW1lbnRzfGVufDB8fHx8MTc4OTA0NzUyNnww&ixlib=rb-4.1.0&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Ensure all text, labels, messages, buttons, and notifications use natural, accurate Bahasa Indonesia suitable for Indonesian power plant inspectors and PLN engineers.",
+    "Provide sample PDF test files / instant sample data generator button so users can test document analysis instantly without needing their own PDF file.",
+    "Implement full end-to-end client/server flow: upload multi-page PDF, auto-detect boundary pages using title & keyword regex rules, present confidence scores, allow manual page range editing, select required files, and generate downloadable single/ZIP files.",
+    "Add 'data-testid' to every interactive button, input, checkbox, table row, and tab for automated test compatibility.",
+    "Use Lucide icons or Radix UI icons for clean technical presentation (e.g. FileText, Scissors, Download, CheckCircle, AlertTriangle, Eye, RefreshCw, Settings).",
+    "Ensure confidence score badges clearly differentiate High Confidence (90-100%, Green), Medium Confidence / Perlu Review (60-89%, Amber), and Low Confidence (0-59%, Red).",
+    "Make the SIUjang Ready checklist interactive so users can mark manual verifications or see auto-validated checks update in real time."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": {
+    "testing_attributes": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case format.",
+    "no_transparent_headers": "DO NOT use transparent background in sticky header or overlays. Always use solid or glassmorphism background with explicit text colors.",
+    "hover_contrast": "Always explicitly define hover text colors matching background contrast.",
+    "micro_interactions": "Include subtle hover animations, loading spinners, and toast notifications via Sonner for all user actions."
+  }
+}

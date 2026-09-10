@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.font-heading {
+    font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+@layer base {
+    :root {
+        --background: 210 40% 98%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 47% 11%;
+        --primary: 200 98% 39%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 222 47% 11%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 215 16% 47%;
+        --accent: 38 92% 50%;
+        --accent-foreground: 26 83% 14%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 214 32% 91%;
+        --input: 214 32% 91%;
+        --ring: 200 98% 39%;
+        --radius: 0.75rem;
+    }
+    .dark {
+        --background: 222 47% 6%;
+        --foreground: 210 40% 98%;
+        --card: 222 40% 9%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222 40% 9%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 199 89% 48%;
+        --primary-foreground: 222 47% 6%;
+        --secondary: 217 33% 15%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217 33% 15%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 38 92% 50%;
+        --accent-foreground: 26 83% 14%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 217 33% 17%;
+        --input: 217 33% 17%;
+        --ring: 199 89% 48%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+@keyframes dropPulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.25); }
+    50% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
+}
+.drop-active { animation: dropPulse 1.4s ease-in-out infinite; }
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.4s ease-out both; }
+
+.grain::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@layer base {
+    [data-debug-wrapper="true"] { display: contents !important; }
+}
